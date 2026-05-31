@@ -14,7 +14,8 @@ public static class StringSearchTool
         RomSession session,
         [Description("Minimum string length to report.")] int minLength = 4,
         [Description("String encoding: ascii or atascii.")] string encoding = "ascii",
-        [Description("Optional substring filter.")] string? filter = null)
+        [Description("Optional substring filter.")] string? filter = null,
+        [Description("Maximum number of results to return. Default is 50. Set higher for fuller coverage or lower to keep responses brief.")] int maxResults = 50)
     {
         try
         {
@@ -42,18 +43,22 @@ public static class StringSearchTool
                 }
                 else
                 {
-                    FlushRun(session, minLength, filter, results, ref start, buffer);
+                    FlushRun(session, minLength, filter, results, ref start, buffer, maxResults);
                 }
             }
 
-            FlushRun(session, minLength, filter, results, ref start, buffer);
+            FlushRun(session, minLength, filter, results, ref start, buffer, maxResults);
 
             if (results.Count == 0)
             {
                 return $"Strings found ({encoding}, minLen={minLength}):\n\n  <none>";
             }
 
-            return $"Strings found ({encoding}, minLen={minLength}):\n\n" + string.Join('\n', results);
+            var summary = results.Count >= maxResults
+                ? $" (showing first {maxResults}; result set truncated)"
+                : string.Empty;
+
+            return $"Strings found ({encoding}, minLen={minLength}){summary}:\n\n" + string.Join('\n', results);
         }
         catch (Exception ex)
         {
@@ -61,15 +66,20 @@ public static class StringSearchTool
         }
     }
 
-    private static void FlushRun(RomSession session, int minLength, string? filter, List<string> results, ref int start, StringBuilder buffer)
+    private const int MaxDisplayedStringLength = 80;
+
+    private static void FlushRun(RomSession session, int minLength, string? filter, List<string> results, ref int start, StringBuilder buffer, int maxResults = 50)
     {
-        if (start >= 0 && buffer.Length >= minLength)
+        if (start >= 0 && buffer.Length >= minLength && results.Count < maxResults)
         {
             var text = buffer.ToString();
             if (string.IsNullOrWhiteSpace(filter) || text.Contains(filter, StringComparison.OrdinalIgnoreCase))
             {
                 var address = XexAddressResolver.ResolveFileOffset(session, start);
-                results.Add($"  ${start:X4} / {(address is null ? "(unknown)" : Formatting.HexWord(address.Value))}  \"{text}\"");
+                var displayText = text.Length <= MaxDisplayedStringLength
+                    ? text
+                    : text[..MaxDisplayedStringLength] + "...";
+                results.Add($"  ${start:X4} / {(address is null ? "(unknown)" : Formatting.HexWord(address.Value))}  [{buffer.Length} bytes] \"{displayText}\"");
             }
         }
 
