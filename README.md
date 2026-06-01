@@ -77,8 +77,13 @@ If you prefer using a published build:
 - `load_rom`
 - `rom_info`
 - `atr_info`
+- `atr_header`
 - `load_atr_file`
 - `load_atr_boot`
+- `list_atr_directory`
+- `analyze_boot_sector`
+- `sector_dump`
+- `search_boot_sector`
 
 ### Inspection and disassembly
 
@@ -110,11 +115,12 @@ If you prefer using a published build:
 ## Typical Workflow
 
 1. Load a file with `load_rom`, `load_atr_file`, or `load_atr_boot`.
-2. Inspect structure with `rom_info`.
-3. Review bytes with `hex_dump`.
-4. Decode code with `disassemble`.
-5. Add labels with `define_symbol` and `annotate_zero_page`.
-6. Search with `x_ref`, `find_pattern`, `find_strings`, and `trace_control_flow`.
+2. Inspect structure with `rom_info` or `atr_info`.
+3. For ATR disk images: use `atr_header` for container metadata, `list_atr_directory` for DOS file listings, `analyze_boot_sector` to decode the boot header, `sector_dump` to inspect raw sectors, and `search_boot_sector` to compare boot code across images.
+4. Review bytes with `hex_dump`.
+5. Decode code with `disassemble`.
+6. Add labels with `define_symbol` and `annotate_zero_page`.
+7. Search with `x_ref`, `find_pattern`, `find_strings`, and `trace_control_flow`.
 
 ## Persistence
 
