@@ -1,4 +1,5 @@
 using System.Text;
+using AtariHackerMCP.Helpers;
 
 namespace AtariHackerMCP.Atari;
 
@@ -17,6 +18,18 @@ public sealed record AtrDirectoryEntry(
 public static class AtrParser
 {
     private const int HeaderSize = 16;
+
+    public static bool HasDosFilesystem(byte[] data)
+    {
+        var geometry = ParseGeometry(data);
+        if (geometry.SectorCount < 368) return false;
+        var vtoc = ReadSector(data, geometry, 360);
+        var dirSectors = vtoc[0];
+        if (dirSectors == 0 || dirSectors > 16) return false;
+        var totalSectors = vtoc[1] | (vtoc[2] << 8);
+        if (totalSectors == 0 || totalSectors > geometry.SectorCount) return false;
+        return true;
+    }
 
     public static bool IsAtr(byte[] data) => data.Length >= HeaderSize && data[0] == 0x96 && data[1] == 0x02;
 
@@ -79,7 +92,7 @@ public static class AtrParser
         return buffer;
     }
 
-    public static IReadOnlyList<AtrDirectoryEntry> ReadDirectory(byte[] data)
+    public static IReadOnlyList<AtrDirectoryEntry> ReadDirectory(byte[] data, bool atascii = false)
     {
         var geometry = ParseGeometry(data);
         var entries = new List<AtrDirectoryEntry>();
@@ -98,8 +111,15 @@ public static class AtrParser
 
                 var sectorCount = bytes[offset + 1] | (bytes[offset + 2] << 8);
                 var startSector = bytes[offset + 3] | (bytes[offset + 4] << 8);
-                var fileName = ReadPaddedString(bytes, offset + 5, 8);
-                var extension = ReadPaddedString(bytes, offset + 13, 3);
+
+                // Skip phantom entries with impossible sector counts
+                if (sectorCount == 0 || sectorCount > geometry.SectorCount) continue;
+
+                // Skip phantom entries with impossible sector numbers
+                if (startSector == 0 || startSector > geometry.SectorCount) continue;
+
+                var fileName = ReadPaddedString(bytes, offset + 5, 8, atascii);
+                var extension = ReadPaddedString(bytes, offset + 13, 3, atascii);
                 var isDeleted = (flags & 0x80) != 0;
                 var isLocked = (flags & 0x20) != 0;
                 var isBinary = (flags & 0x42) == 0x42;
@@ -200,7 +220,7 @@ public static class AtrParser
         return count;
     }
 
-    private static int SectorFileOffset(AtrGeometry geometry, int sectorNumber)
+    internal static int SectorFileOffset(AtrGeometry geometry, int sectorNumber)
     {
         if (geometry.SectorSize == 256 && sectorNumber > 3)
         {
@@ -210,8 +230,12 @@ public static class AtrParser
         return HeaderSize + ((sectorNumber - 1) * geometry.SectorSize);
     }
 
-    private static string ReadPaddedString(byte[] bytes, int offset, int length)
+    private static string ReadPaddedString(byte[] bytes, int offset, int length, bool atascii = false)
     {
+        if (atascii)
+        {
+            return AtasciiDecoder.Decode(bytes.AsSpan(offset, length)).TrimEnd(' ', '\0');
+        }
         return Encoding.ASCII.GetString(bytes, offset, length).TrimEnd(' ', '\0');
     }
 }

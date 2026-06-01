@@ -35,6 +35,16 @@ public static class ControlFlowTool
             var budget = Math.Max(1, maxInstructions);
             var lines = new List<string> { FormatNodeHeader(startAddress, symbols, zeroPageMap) };
             TraceBlock(session, symbols, zeroPageMap, startAddress, startOffset.Value, 0, Math.Max(0, maxDepth), new HashSet<ushort>(), new HashSet<ushort>(), lines, ref budget);
+
+            // BRK hint: if the first instruction at the start address is BRK (opcode $00)
+            if (startOffset.Value < session.Length && session.Data[startOffset.Value] == 0x00)
+            {
+                lines.Add("");
+                lines.Add($"NOTE: {Formatting.HexWord(startAddress)} disassembles as BRK. If this is a boot sector, the actual");
+                lines.Add($"      code starts at $0706 (after the 6-byte boot header). Use");
+                lines.Add($"      analyze_boot_sector to confirm, then re-run with address=$0706.");
+            }
+
             return string.Join('\n', lines);
         }
         catch (Exception ex)

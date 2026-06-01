@@ -51,6 +51,22 @@ public static class HexDumpTool
         }
 
         var count = Math.Min(numBytes, session.Length - offset);
+        return GenerateHexDump(session.Data.AsSpan(offset, count), offset, count, startAddress);
+    }
+
+    internal static string GenerateHexDump(byte[] data, int offset, int numBytes, ushort? startAddress = null)
+    {
+        var count = Math.Min(numBytes, data.Length - offset);
+        return GenerateHexDump(data.AsSpan(offset, count), offset, count, startAddress);
+    }
+
+    internal static string GenerateHexDump(ReadOnlySpan<byte> span, int fileOffset, int count, ushort? startAddress = null)
+    {
+        if (count <= 0)
+        {
+            return "ERROR: Number of bytes must be greater than zero.";
+        }
+
         var lines = new List<string>
         {
             "Offset    Address   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  ASCII",
@@ -59,10 +75,10 @@ public static class HexDumpTool
 
         for (var rowStart = 0; rowStart < count; rowStart += 16)
         {
-            var currentOffset = offset + rowStart;
+            var currentOffset = fileOffset + rowStart;
             var rowCount = Math.Min(16, count - rowStart);
             var address = startAddress is null
-                ? XexAddressResolver.ResolveFileOffset(session, currentOffset)
+                ? (ushort?)null
                 : (ushort)(startAddress.Value + rowStart);
 
             var hex = new StringBuilder();
@@ -71,7 +87,7 @@ public static class HexDumpTool
             {
                 if (i < rowCount)
                 {
-                    var value = session.Data[currentOffset + i];
+                    var value = span[rowStart + i];
                     hex.Append(value.ToString("X2")).Append(' ');
                     ascii.Append(value is >= 0x20 and <= 0x7E ? (char)value : '.');
                 }
@@ -83,6 +99,48 @@ public static class HexDumpTool
             }
 
             lines.Add($"{Formatting.HexOffset(currentOffset)}  {Formatting.DisplayAddress(address),-8}  {hex.ToString().TrimEnd(),-47}  {ascii}");
+        }
+
+        return string.Join('\n', lines);
+    }
+
+    internal static string GenerateHexDumpWithCustomLabels(ReadOnlySpan<byte> span, int fileOffset, int count, Func<int, string> addressLabel)
+    {
+        if (count <= 0)
+        {
+            return "ERROR: Number of bytes must be greater than zero.";
+        }
+
+        var lines = new List<string>
+        {
+            "Offset    Address   00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F  ASCII",
+            "--------  ---------  -----------------------------------------------  ----------------"
+        };
+
+        for (var rowStart = 0; rowStart < count; rowStart += 16)
+        {
+            var currentOffset = fileOffset + rowStart;
+            var rowCount = Math.Min(16, count - rowStart);
+            var label = addressLabel(currentOffset);
+
+            var hex = new StringBuilder();
+            var ascii = new StringBuilder();
+            for (var i = 0; i < 16; i++)
+            {
+                if (i < rowCount)
+                {
+                    var value = span[rowStart + i];
+                    hex.Append(value.ToString("X2")).Append(' ');
+                    ascii.Append(value is >= 0x20 and <= 0x7E ? (char)value : '.');
+                }
+                else
+                {
+                    hex.Append("   ");
+                    ascii.Append(' ');
+                }
+            }
+
+            lines.Add($"{Formatting.HexOffset(currentOffset)}  {label,-9}  {hex.ToString().TrimEnd(),-47}  {ascii}");
         }
 
         return string.Join('\n', lines);

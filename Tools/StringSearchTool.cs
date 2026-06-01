@@ -101,27 +101,19 @@ public static class StringSearchTool
             return false;
         }
 
-        var inverse = (value & 0x80) != 0;
-        var plain = (byte)(value & 0x7F);
-        if (plain is >= 0x20 and <= 0x5F)
+        var ch = AtasciiDecoder.DecodeByte(value);
+        if (ch != '.')
         {
-            decoded = (inverse ? "~" : string.Empty) + ((char)plain);
-            return true;
-        }
-
-        if (plain <= 0x1F)
-        {
-            var mapped = plain switch
+            // AtasciiDecoder.DecodeByte uses char >= 128 as inverse marker
+            if (ch >= 128)
             {
-                <= 25 => ((char)('A' + plain)).ToString(),
-                <= 35 => ((char)('0' + plain - 26)).ToString(),
-                _ => string.Empty
-            };
-            if (!string.IsNullOrEmpty(mapped))
-            {
-                decoded = (inverse ? "~" : string.Empty) + mapped;
-                return true;
+                decoded = "~" + (char)(ch - 128);
             }
+            else
+            {
+                decoded = ch.ToString();
+            }
+            return true;
         }
 
         decoded = string.Empty;

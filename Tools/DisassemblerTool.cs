@@ -9,7 +9,7 @@ namespace AtariHackerMCP.Tools;
 [McpServerToolType]
 public static class DisassemblerTool
 {
-    [McpServerTool, Description("Disassemble 6502 machine code from the loaded ROM.")]
+    [McpServerTool, Description("Disassemble 6502 machine code from the loaded ROM. Provide startAddress when the ROM lacks a built-in address map (e.g., boot sectors loaded via LoadAtrBoot should use startAddress=$0706, the entry point after the 6-byte boot header).")]
     public static string Disassemble(
         RomSession session,
         SymbolTable symbols,
@@ -32,6 +32,11 @@ public static class DisassemblerTool
             }
 
             var addressOverride = string.IsNullOrWhiteSpace(startAddress) ? (ushort?)null : AddressParser.ParseAddress(startAddress);
+
+            // Emit advisory when no address mapping is available
+            var hasMapping = addressOverride is not null
+                || (session.Segments is { Count: > 0 })
+                || session.BaseAddress is not null;
             var end = Math.Min(session.Length, fileOffset + Math.Max(numBytes, 0));
             var lines = new List<string>();
             var position = fileOffset;
@@ -60,6 +65,13 @@ public static class DisassemblerTool
                 var commentText = comments.Count == 0 ? string.Empty : $"  ; {string.Join(" | ", comments)}";
                 lines.Add($"{FormatMemoryAddress(currentAddress)}  {byteText}  {mnemonicText}{commentText}");
                 position += entry.Bytes;
+            }
+
+            if (!hasMapping)
+            {
+                lines.Insert(0, "NOTE: No address mapping available. Memory addresses shown as file offsets.");
+                lines.Insert(1, "      Use the startAddress parameter to set a base address (e.g., startAddress=$0700).");
+                lines.Insert(2, "");
             }
 
             return string.Join('\n', lines);
