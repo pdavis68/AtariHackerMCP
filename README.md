@@ -149,3 +149,7 @@ This sends `initialize` and `tools/list` directly over stdio:
 
 - Logs are written to stderr so stdout remains clean for MCP JSON-RPC traffic.
 - The current build may show a NuGet compatibility warning for `NCalc`, but the server builds and runs successfully.
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
